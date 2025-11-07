@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
 import com.autoappsheduler.model.AppInfo
 import com.autoappsheduler.model.Schedule
@@ -76,14 +77,15 @@ fun MainScreen(
 ) {
     val context = LocalContext.current
     var isAccessibilityServiceEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
-    val installedApps by viewModel.installedApps.collectAsState()
-    val schedules by viewModel.schedules.collectAsState()
+    val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
+    val schedules by viewModel.schedules.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isAccessibilityServiceEnabled = isAccessibilityServiceEnabled(context)
+                viewModel.deleteExpiredSchedules()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

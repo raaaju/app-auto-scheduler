@@ -7,10 +7,12 @@ import com.autoappsheduler.model.AppInfo
 import com.autoappsheduler.model.Schedule
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 
 @HiltViewModel
@@ -18,15 +20,18 @@ class MainViewModel @Inject constructor(
     private val repository: AppSchedulerRepository
 ) : ViewModel() {
 
+    val schedules: StateFlow<List<Schedule>> = repository.getAllSchedules()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     private val _installedApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val installedApps: StateFlow<List<AppInfo>> = _installedApps
 
-    private val _schedules = MutableStateFlow<List<Schedule>>(emptyList())
-    val schedules: StateFlow<List<Schedule>> = _schedules
-
     init {
         loadInstalledApps()
-        loadSchedules()
     }
 
     private fun loadInstalledApps() {
@@ -35,10 +40,19 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun loadSchedules() {
-        repository.getAllSchedules().onEach {
-            _schedules.value = it
-        }.launchIn(viewModelScope)
+    fun deleteExpiredSchedules() {
+        viewModelScope.launch {
+            val calendar = Calendar.getInstance()
+            val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+            val currentMinute = calendar.get(Calendar.MINUTE)
+
+            val currentSchedules = repository.getAllSchedules().first()
+            currentSchedules.forEach { schedule ->
+                if (schedule.hour < currentHour || (schedule.hour == currentHour && schedule.minute <= currentMinute)) {
+                    repository.deleteSchedule(schedule)
+                }
+            }
+        }
     }
 
     fun scheduleApp(packageName: String, hour: Int, minute: Int) {
