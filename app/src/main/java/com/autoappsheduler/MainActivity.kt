@@ -1,6 +1,5 @@
 package com.autoappsheduler
 
-import android.app.TimePickerDialog
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -40,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
 import com.autoappsheduler.model.AppInfo
 import com.autoappsheduler.model.Schedule
@@ -48,6 +46,10 @@ import com.autoappsheduler.theme.AppSchedulerTheme
 import com.autoappsheduler.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.Calendar
+
+private sealed class DialogType
+private object TimePickerDialog : DialogType()
+private object CancelDialog : DialogType()
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -77,8 +79,8 @@ fun MainScreen(
 ) {
     val context = LocalContext.current
     var isAccessibilityServiceEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
-    val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
-    val schedules by viewModel.schedules.collectAsStateWithLifecycle()
+    val installedApps by viewModel.installedApps.collectAsState()
+    val schedules by viewModel.schedules.collectAsState()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -120,42 +122,43 @@ fun AppList(apps: List<AppInfo>, schedules: List<Schedule>, modifier: Modifier =
 @Composable
 fun AppListItem(appInfo: AppInfo, schedule: Schedule?, viewModel: MainViewModel) {
     val context = LocalContext.current
-    var showTimePicker by remember { mutableStateOf(false) }
-    var showCancelDialog by remember { mutableStateOf(false) }
+    var dialogToShow by remember(schedule) { mutableStateOf<DialogType?>(null) }
 
-    if (showTimePicker) {
-        val calendar = Calendar.getInstance()
-        TimePickerDialog(
-            context,
-            { _, hour, minute ->
-                viewModel.scheduleApp(appInfo.packageName, hour, minute)
-                showTimePicker = false
-            },
-            calendar.get(Calendar.HOUR_OF_DAY),
-            calendar.get(Calendar.MINUTE),
-            false
-        ).show()
-    }
-
-    if (showCancelDialog) {
-        AlertDialog(
-            onDismissRequest = { showCancelDialog = false },
-            title = { Text("Cancel Schedule") },
-            text = { Text("Are you sure you want to cancel this schedule?") },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.deleteSchedule(appInfo.packageName)
-                    showCancelDialog = false
-                }) {
-                    Text("Yes")
+    when (dialogToShow) {
+         TimePickerDialog -> {
+            val calendar = Calendar.getInstance()
+            android.app.TimePickerDialog(
+                context,
+                { _, hour, minute ->
+                    viewModel.scheduleApp(appInfo.packageName, hour, minute)
+                    dialogToShow = null
+                },
+                calendar.get(Calendar.HOUR_OF_DAY),
+                calendar.get(Calendar.MINUTE),
+                false
+            ).show()
+        }
+        CancelDialog -> {
+            AlertDialog(
+                onDismissRequest = { dialogToShow = null },
+                title = { Text("Cancel Schedule") },
+                text = { Text("Are you sure you want to cancel this schedule?") },
+                confirmButton = {
+                    Button(onClick = {
+                        viewModel.deleteSchedule(appInfo.packageName)
+                        dialogToShow = null
+                    }) {
+                        Text("Yes")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { dialogToShow = null }) {
+                        Text("No")
+                    }
                 }
-            },
-            dismissButton = {
-                Button(onClick = { showCancelDialog = false }) {
-                    Text("No")
-                }
-            }
-        )
+            )
+        }
+        else -> {}
     }
 
     Row(
@@ -178,10 +181,10 @@ fun AppListItem(appInfo: AppInfo, schedule: Schedule?, viewModel: MainViewModel)
             Text(text = appInfo.packageName)
         }
         Button(onClick = {
-            if (schedule != null) {
-                showCancelDialog = true
+            dialogToShow = if (schedule != null) {
+                CancelDialog
             } else {
-                showTimePicker = true
+                TimePickerDialog
             }
         }) {
             if (schedule != null) {

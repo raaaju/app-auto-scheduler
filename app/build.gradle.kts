@@ -7,6 +7,14 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("/Users/raaju/AndroidTest/appSheduler/key/appscheduletest.jks")
+            storePassword = "12345678"
+            keyAlias = "scheduleapp"
+            keyPassword = "12345678"
+        }
+    }
     namespace = "com.autoappsheduler"
     compileSdk {
         version = release(36)
@@ -29,6 +37,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -40,6 +49,9 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    lint {
+        disable.add("RemoveWorkManagerInitializer")
     }
 }
 
