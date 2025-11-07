@@ -125,9 +125,9 @@ fun AppListItem(appInfo: AppInfo, schedule: Schedule?, viewModel: MainViewModel)
     var dialogToShow by remember(schedule) { mutableStateOf<DialogType?>(null) }
 
     when (dialogToShow) {
-         TimePickerDialog -> {
+        TimePickerDialog -> {
             val calendar = Calendar.getInstance()
-            android.app.TimePickerDialog(
+            val timePickerDialog = android.app.TimePickerDialog(
                 context,
                 { _, hour, minute ->
                     viewModel.scheduleApp(appInfo.packageName, hour, minute)
@@ -136,7 +136,9 @@ fun AppListItem(appInfo: AppInfo, schedule: Schedule?, viewModel: MainViewModel)
                 calendar.get(Calendar.HOUR_OF_DAY),
                 calendar.get(Calendar.MINUTE),
                 false
-            ).show()
+            )
+            timePickerDialog.setOnCancelListener { dialogToShow = null }
+            timePickerDialog.show()
         }
         CancelDialog -> {
             AlertDialog(
