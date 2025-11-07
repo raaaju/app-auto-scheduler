@@ -2,20 +2,29 @@ package com.autoappsheduler.worker
 
 import android.content.Context
 import android.content.Intent
-import androidx.work.Worker
+import androidx.hilt.work.HiltWorker
+import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.autoappsheduler.MyAccessibilityService
+import com.autoappsheduler.db.ScheduleDao
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-class OpenAppWorker(private val appContext: Context, workerParams: WorkerParameters) : Worker(appContext, workerParams) {
+@HiltWorker
+class OpenAppWorker @AssistedInject constructor(
+    @Assisted appContext: Context,
+    @Assisted workerParams: WorkerParameters
+) : CoroutineWorker(appContext, workerParams) {
 
-    override fun doWork(): Result {
+    override suspend fun doWork(): Result {
         val packageName = inputData.getString("PACKAGE_NAME")
-
         return if (packageName != null) {
             val intent = Intent(MyAccessibilityService.ACTION_OPEN_APP).apply {
                 putExtra(MyAccessibilityService.EXTRA_PACKAGE_NAME, packageName)
             }
-            appContext.sendBroadcast(intent)
+            applicationContext.sendBroadcast(intent)
             Result.success()
         } else {
             Result.failure()

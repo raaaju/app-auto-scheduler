@@ -1,72 +1,62 @@
 package com.autoappsheduler.viewmodel
 
-import android.app.Application
-import android.content.pm.ApplicationInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
+import com.autoappsheduler.data.AppSchedulerRepository
 import com.autoappsheduler.model.AppInfo
-import com.autoappsheduler.worker.OpenAppWorker
+import com.autoappsheduler.model.Schedule
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import java.util.Calendar
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val application: Application
+    private val repository: AppSchedulerRepository
 ) : ViewModel() {
 
     private val _installedApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val installedApps: StateFlow<List<AppInfo>> = _installedApps
 
+    private val _schedules = MutableStateFlow<List<Schedule>>(emptyList())
+    val schedules: StateFlow<List<Schedule>> = _schedules
+
     init {
         loadInstalledApps()
+        loadSchedules()
     }
 
     private fun loadInstalledApps() {
         viewModelScope.launch {
-            val pm = application.packageManager
-            val apps = pm.getInstalledApplications(0)
-            val appInfos = apps.mapNotNull { appInfo ->
-                if (pm.getLaunchIntentForPackage(appInfo.packageName) != null) {
-                    val appName = appInfo.loadLabel(pm).toString()
-                    val icon = appInfo.loadIcon(pm)
-                    AppInfo(appName, appInfo.packageName, icon)
-                } else {
-                    null
-                }
-            }
-            _installedApps.value = appInfos
+            _installedApps.value = repository.getInstalledApps()
         }
     }
 
+    private fun loadSchedules() {
+        repository.getAllSchedules().onEach {
+            _schedules.value = it
+        }.launchIn(viewModelScope)
+    }
+
     fun scheduleApp(packageName: String, hour: Int, minute: Int) {
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-            if (before(Calendar.getInstance())) {
-                add(Calendar.DATE, 1)
+        viewModelScope.launch {
+            repository.scheduleApp(packageName, hour, minute)
+        }
+    }
+
+    fun getScheduleForApp(packageName: String): Schedule? {
+        return schedules.value.find { it.packageName == packageName }
+    }
+
+    fun deleteSchedule(packageName: String) {
+        viewModelScope.launch {
+            val schedule = getScheduleForApp(packageName)
+            if (schedule != null) {
+                repository.deleteSchedule(schedule)
             }
         }
-
-        val delay = calendar.timeInMillis - System.currentTimeMillis()
-
-        val data = Data.Builder()
-            .putString("PACKAGE_NAME", packageName)
-            .build()
-
-        val workRequest = OneTimeWorkRequestBuilder<OpenAppWorker>()
-            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-            .setInputData(data)
-            .build()
-
-        WorkManager.getInstance(application).enqueue(workRequest)
     }
 }

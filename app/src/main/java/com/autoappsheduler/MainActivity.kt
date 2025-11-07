@@ -42,6 +42,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.rememberAsyncImagePainter
 import com.autoappsheduler.model.AppInfo
+import com.autoappsheduler.model.Schedule
 import com.autoappsheduler.theme.AppSchedulerTheme
 import com.autoappsheduler.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -76,6 +77,7 @@ fun MainScreen(
     val context = LocalContext.current
     var isAccessibilityServiceEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
     val installedApps by viewModel.installedApps.collectAsState()
+    val schedules by viewModel.schedules.collectAsState()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -99,23 +101,25 @@ fun MainScreen(
             onDismiss = {}
         )
     } else {
-        AppList(apps = installedApps, modifier = modifier, viewModel = viewModel)
+        AppList(apps = installedApps, schedules = schedules, modifier = modifier, viewModel = viewModel)
     }
 }
 
 @Composable
-fun AppList(apps: List<AppInfo>, modifier: Modifier = Modifier, viewModel: MainViewModel) {
+fun AppList(apps: List<AppInfo>, schedules: List<Schedule>, modifier: Modifier = Modifier, viewModel: MainViewModel) {
     LazyColumn(modifier = modifier) {
         items(apps) { app ->
-            AppListItem(appInfo = app, viewModel = viewModel)
+            val schedule = schedules.find { it.packageName == app.packageName }
+            AppListItem(appInfo = app, schedule = schedule, viewModel = viewModel)
         }
     }
 }
 
 @Composable
-fun AppListItem(appInfo: AppInfo, viewModel: MainViewModel) {
+fun AppListItem(appInfo: AppInfo, schedule: Schedule?, viewModel: MainViewModel) {
     val context = LocalContext.current
     var showTimePicker by remember { mutableStateOf(false) }
+    var showCancelDialog by remember { mutableStateOf(false) }
 
     if (showTimePicker) {
         val calendar = Calendar.getInstance()
@@ -129,6 +133,27 @@ fun AppListItem(appInfo: AppInfo, viewModel: MainViewModel) {
             calendar.get(Calendar.MINUTE),
             false
         ).show()
+    }
+
+    if (showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            title = { Text("Cancel Schedule") },
+            text = { Text("Are you sure you want to cancel this schedule?") },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.deleteSchedule(appInfo.packageName)
+                    showCancelDialog = false
+                }) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showCancelDialog = false }) {
+                    Text("No")
+                }
+            }
+        )
     }
 
     Row(
@@ -150,12 +175,21 @@ fun AppListItem(appInfo: AppInfo, viewModel: MainViewModel) {
             Text(text = appInfo.appName)
             Text(text = appInfo.packageName)
         }
-        Button(onClick = { showTimePicker = true }) {
-            Text("Schedule")
+        Button(onClick = {
+            if (schedule != null) {
+                showCancelDialog = true
+            } else {
+                showTimePicker = true
+            }
+        }) {
+            if (schedule != null) {
+                Text(String.format("Scheduled for %02d:%02d", schedule.hour, schedule.minute))
+            } else {
+                Text("Schedule")
+            }
         }
     }
 }
-
 
 @Composable
 fun AccessibilityPermissionDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
