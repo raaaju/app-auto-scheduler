@@ -1,7 +1,7 @@
 package com.autoappsheduler.viewmodel
 
 import android.app.Application
-import android.content.Intent
+import android.content.pm.ApplicationInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Data
@@ -32,14 +32,15 @@ class MainViewModel @Inject constructor(
     private fun loadInstalledApps() {
         viewModelScope.launch {
             val pm = application.packageManager
-            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-            }
-            val appInfos = pm.queryIntentActivities(mainIntent, 0).mapNotNull { resolveInfo ->
-                val appName = resolveInfo.loadLabel(pm).toString()
-                val packageName = resolveInfo.activityInfo.packageName
-                val icon = resolveInfo.loadIcon(pm)
-                AppInfo(appName, packageName, icon)
+            val apps = pm.getInstalledApplications(0)
+            val appInfos = apps.mapNotNull { appInfo ->
+                if (pm.getLaunchIntentForPackage(appInfo.packageName) != null) {
+                    val appName = appInfo.loadLabel(pm).toString()
+                    val icon = appInfo.loadIcon(pm)
+                    AppInfo(appName, appInfo.packageName, icon)
+                } else {
+                    null
+                }
             }
             _installedApps.value = appInfos
         }
