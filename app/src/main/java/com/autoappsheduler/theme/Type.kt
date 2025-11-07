@@ -1,4 +1,4 @@
-package com.test.appscheduler.ui.theme
+package com.autoappsheduler.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

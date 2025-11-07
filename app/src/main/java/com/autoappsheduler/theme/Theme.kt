@@ -1,6 +1,5 @@
-package com.test.appscheduler.ui.theme
+package com.autoappsheduler.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
